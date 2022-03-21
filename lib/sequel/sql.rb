@@ -368,7 +368,7 @@ module Sequel
         SQL::CaseExpression.new(*args)
       end
 
-      # Cast the reciever to the given SQL type.  You can specify a ruby class as a type,
+      # Cast the receiver to the given SQL type.  You can specify a ruby class as a type,
       # and it is handled similarly to using a database independent type in the schema methods.
       #
       #   Sequel.cast(:a, :integer) # CAST(a AS integer)
@@ -377,7 +377,7 @@ module Sequel
         SQL::Cast.new(arg, sql_type)
       end
 
-      # Cast the reciever to the given SQL type (or the database's default Integer type if none given),
+      # Cast the receiver to the given SQL type (or the database's default Integer type if none given),
       # and return the result as a +NumericExpression+, so you can use the bitwise operators
       # on the result. 
       #
@@ -387,7 +387,7 @@ module Sequel
         cast(arg, sql_type || Integer).sql_number
       end
 
-      # Cast the reciever to the given SQL type (or the database's default String type if none given),
+      # Cast the receiver to the given SQL type (or the database's default String type if none given),
       # and return the result as a +StringExpression+, so you can use +
       # directly on the result for SQL string concatenation.
       #
@@ -684,7 +684,7 @@ module Sequel
 
     # Holds methods that are used to cast objects to different SQL types.
     module CastMethods 
-      # Cast the reciever to the given SQL type.  You can specify a ruby class as a type,
+      # Cast the receiver to the given SQL type.  You can specify a ruby class as a type,
       # and it is handled similarly to using a database independent type in the schema methods.
       #
       #   Sequel.function(:func).cast(:integer) # CAST(func() AS integer)
@@ -693,7 +693,7 @@ module Sequel
         Cast.new(self, sql_type)
       end
 
-      # Cast the reciever to the given SQL type (or the database's default Integer type if none given),
+      # Cast the receiver to the given SQL type (or the database's default Integer type if none given),
       # and return the result as a +NumericExpression+, so you can use the bitwise operators
       # on the result. 
       #
@@ -703,7 +703,7 @@ module Sequel
         Cast.new(self, sql_type || Integer).sql_number
       end
 
-      # Cast the reciever to the given SQL type (or the database's default String type if none given),
+      # Cast the receiver to the given SQL type (or the database's default String type if none given),
       # and return the result as a +StringExpression+, so you can use +
       # directly on the result for SQL string concatenation.
       #
