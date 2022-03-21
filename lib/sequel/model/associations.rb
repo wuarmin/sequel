@@ -1836,7 +1836,9 @@ module Sequel
 
           if opts[:clone]
             cloned_assoc = association_reflection(opts[:clone])
+            remove_class_name = orig_opts[:class] && !orig_opts[:class_name]
             orig_opts = cloned_assoc[:orig_opts].merge(orig_opts)
+            orig_opts.delete(:class_name) if remove_class_name
           end
 
           opts = Hash[default_association_options]
@@ -3128,7 +3130,7 @@ module Sequel
 
         # The secondary eager loading method.  Loads all associations in a single query. This
         # method should only be used if you need to filter or order based on columns in associated tables,
-        # or if you have done comparative benchmarking it and determined it is faster.
+        # or if you have done comparative benchmarking and determined it is faster.
         #
         # This method uses <tt>Dataset#graph</tt> to create appropriate aliases for columns in all the
         # tables.  Then it uses the graph's metadata to build the associations from the single hash, and

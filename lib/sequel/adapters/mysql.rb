@@ -1,7 +1,7 @@
 # frozen-string-literal: true
 
 require 'mysql'
-raise(LoadError, "require 'mysql' did not define Mysql::CLIENT_MULTI_RESULTS!\n  You are probably using the pure ruby mysql.rb driver,\n  which Sequel does not support. You need to install\n  the C based adapter, and make sure that the mysql.so\n  file is loaded instead of the mysql.rb file.\n") unless defined?(Mysql::CLIENT_MULTI_RESULTS)
+raise(LoadError, "require 'mysql' did not define Mysql::CLIENT_MULTI_RESULTS!, so it not supported. Please install the mysql or ruby-mysql gem.\n") unless defined?(Mysql::CLIENT_MULTI_RESULTS)
 
 require_relative 'utils/mysql_mysql2'
 require_relative 'utils/mysql_prepared_statements'
@@ -71,21 +71,43 @@ module Sequel
       #             disconnect this connection (a.k.a @@wait_timeout).
       def connect(server)
         opts = server_opts(server)
-        conn = Mysql.init
-        conn.options(Mysql::READ_DEFAULT_GROUP, opts[:config_default_group] || "client")
-        conn.options(Mysql::OPT_LOCAL_INFILE, opts[:config_local_infile]) if opts.has_key?(:config_local_infile)
+
+        if Mysql.respond_to?(:init)
+          conn = Mysql.init
+          conn.options(Mysql::READ_DEFAULT_GROUP, opts[:config_default_group] || "client")
+          conn.options(Mysql::OPT_LOCAL_INFILE, opts[:config_local_infile]) if opts.has_key?(:config_local_infile)
+          if encoding = opts[:encoding] || opts[:charset]
+            # Set encoding before connecting so that the mysql driver knows what
+            # encoding we want to use, but this can be overridden by READ_DEFAULT_GROUP.
+            conn.options(Mysql::SET_CHARSET_NAME, encoding)
+          end
+          if read_timeout = opts[:read_timeout] and defined? Mysql::OPT_READ_TIMEOUT
+            conn.options(Mysql::OPT_READ_TIMEOUT, read_timeout)
+          end
+          if connect_timeout = opts[:connect_timeout] and defined? Mysql::OPT_CONNECT_TIMEOUT
+            conn.options(Mysql::OPT_CONNECT_TIMEOUT, connect_timeout)
+          end
+        else
+          # ruby-mysql 3 API
+          conn = Mysql.new
+          # no support for default group
+          conn.local_infile = opts[:config_local_infile] if opts.has_key?(:config_local_infile)
+          if encoding = opts[:encoding] || opts[:charset]
+            conn.charset = encoding
+          end
+          if read_timeout = opts[:read_timeout]
+            conn.read_timeout = read_timeout
+          end
+          if connect_timeout = opts[:connect_timeout]
+            conn.connect_timeout = connect_timeout
+          end
+          conn.singleton_class.class_eval do
+            alias real_connect connect
+            alias use_result store_result
+          end
+        end
+
         conn.ssl_set(opts[:sslkey], opts[:sslcert], opts[:sslca], opts[:sslcapath], opts[:sslcipher]) if opts[:sslca] || opts[:sslkey]
-        if encoding = opts[:encoding] || opts[:charset]
-          # Set encoding before connecting so that the mysql driver knows what
-          # encoding we want to use, but this can be overridden by READ_DEFAULT_GROUP.
-          conn.options(Mysql::SET_CHARSET_NAME, encoding)
-        end
-        if read_timeout = opts[:read_timeout] and defined? Mysql::OPT_READ_TIMEOUT
-          conn.options(Mysql::OPT_READ_TIMEOUT, read_timeout)
-        end
-        if connect_timeout = opts[:connect_timeout] and defined? Mysql::OPT_CONNECT_TIMEOUT
-          conn.options(Mysql::OPT_CONNECT_TIMEOUT, connect_timeout)
-        end
         conn.real_connect(
           opts[:host] || 'localhost',
           opts[:user],
@@ -152,56 +174,49 @@ module Sequel
         super
       end
 
-      # Return the version of the MySQL server to which we are connecting.
-      def server_version(server=nil)
-        @server_version ||= (synchronize(server){|conn| conn.server_version if conn.respond_to?(:server_version)} || super)
-      end
-
       private
       
       # Execute the given SQL on the given connection.  If the :type
       # option is :select, yield the result of the query, otherwise
       # yield the connection if a block is given.
       def _execute(conn, sql, opts)
-        begin
-          r = log_connection_yield((log_sql = opts[:log_sql]) ? sql + log_sql : sql, conn){conn.query(sql)}
-          if opts[:type] == :select
-            yield r if r
-          elsif defined?(yield)
-            yield conn
-          end
-          if conn.respond_to?(:more_results?)
-            while conn.more_results? do
-              if r
-                r.free
-                r = nil
-              end
-              begin
-                conn.next_result
-                r = conn.use_result
-              rescue Mysql::Error => e
-                raise_error(e, :disconnect=>true) if MYSQL_DATABASE_DISCONNECT_ERRORS.match(e.message)
-                break
-              end
-              yield r if opts[:type] == :select
+        r = log_connection_yield((log_sql = opts[:log_sql]) ? sql + log_sql : sql, conn){conn.query(sql)}
+        if opts[:type] == :select
+          yield r if r
+        elsif defined?(yield)
+          yield conn
+        end
+        if conn.respond_to?(:more_results?)
+          while conn.more_results? do
+            if r
+              r.free
+              r = nil
             end
-          end
-        rescue Mysql::Error => e
-          raise_error(e)
-        ensure
-          r.free if r
-          # Use up all results to avoid a commands out of sync message.
-          if conn.respond_to?(:more_results?)
-            while conn.more_results? do
-              begin
-                conn.next_result
-                r = conn.use_result
-              rescue Mysql::Error => e
-                raise_error(e, :disconnect=>true) if MYSQL_DATABASE_DISCONNECT_ERRORS.match(e.message)
-                break
-              end
-              r.free if r
+            begin
+              conn.next_result
+              r = conn.use_result
+            rescue Mysql::Error => e
+              raise_error(e, :disconnect=>true) if MYSQL_DATABASE_DISCONNECT_ERRORS.match(e.message)
+              break
             end
+            yield r if opts[:type] == :select
+          end
+        end
+      rescue Mysql::Error => e
+        raise_error(e)
+      ensure
+        r.free if r
+        # Use up all results to avoid a commands out of sync message.
+        if conn.respond_to?(:more_results?)
+          while conn.more_results? do
+            begin
+              conn.next_result
+              r = conn.use_result
+            rescue Mysql::Error => e
+              raise_error(e, :disconnect=>true) if MYSQL_DATABASE_DISCONNECT_ERRORS.match(e.message)
+              break
+            end
+            r.free if r
           end
         end
       end
@@ -233,17 +248,15 @@ module Sequel
       # the conversion raises an InvalidValue exception, return v
       # if :string and nil otherwise.
       def convert_date_time(v)
-        begin
-          yield v
-        rescue InvalidValue
-          case @convert_invalid_date_time
-          when nil, :nil
-            nil
-          when :string
-            v
-          else 
-            raise
-          end
+        yield v
+      rescue InvalidValue
+        case @convert_invalid_date_time
+        when nil, :nil
+          nil
+        when :string
+          v
+        else 
+          raise
         end
       end
     

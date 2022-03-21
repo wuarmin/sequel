@@ -95,6 +95,8 @@ module Sequel
     # options hash.
     #
     # Accepts the following options:
+    # :before_preconnect :: Callable that runs after extensions from :preconnect_extensions are loaded,
+    #                       but before any connections are created.
     # :cache_schema :: Whether schema should be cached for this Database instance
     # :default_string_column_size :: The default size of string columns, 255 by default.
     # :extensions :: Extensions to load into this Database instance.  Can be a symbol, array of symbols,
@@ -159,6 +161,10 @@ module Sequel
         Sequel::Database.run_after_initialize(self)
 
         initialize_load_extensions(:preconnect_extensions)
+
+        if before_preconnect = @opts[:before_preconnect]
+          before_preconnect.call(self)
+        end
 
         if typecast_value_boolean(@opts[:preconnect]) && @pool.respond_to?(:preconnect, true)
           concurrent = typecast_value_string(@opts[:preconnect]) == "concurrently"

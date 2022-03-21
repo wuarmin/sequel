@@ -108,7 +108,7 @@ module Sequel
 
       # Call the ANY function:
       #
-      #   array_op.all # ANY(array)
+      #   array_op.any # ANY(array)
       #
       # Usually used like:
       #
@@ -329,7 +329,7 @@ end
 if defined?(Sequel::CoreRefinements)
   module Sequel::CoreRefinements
     refine Symbol do
-      include Sequel::Postgres::ArrayOpMethods
+      send INCLUDE_METH, Sequel::Postgres::ArrayOpMethods
     end
   end
 end

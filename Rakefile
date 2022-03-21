@@ -70,7 +70,7 @@ run_spec = proc do |file|
   lib_dir = File.join(File.dirname(File.expand_path(__FILE__)), 'lib')
   rubylib = ENV['RUBYLIB']
   ENV['RUBYLIB'] ? (ENV['RUBYLIB'] += ":#{lib_dir}") : (ENV['RUBYLIB'] = lib_dir)
-  sh "#{FileUtils::RUBY} #{file}"
+  sh "#{FileUtils::RUBY} #{"-w" if RUBY_VERSION >= '3'} #{file}"
   ENV['RUBYLIB'] = rubylib
 end
 
@@ -78,16 +78,6 @@ spec_task = proc do |description, name, file, coverage, visibility|
   desc description
   task name do
     run_spec.call(file)
-  end
-
-  desc "#{description} with warnings, some warnings filtered"
-  task :"#{name}_w" do
-    rubyopt = ENV['RUBYOPT']
-    ENV['RUBYOPT'] = "#{rubyopt} -w"
-    ENV['WARNING'] = '1'
-    run_spec.call(file)
-    ENV.delete('WARNING')
-    ENV['RUBYOPT'] = rubyopt
   end
 
   if coverage
@@ -155,15 +145,17 @@ task :spec_ci=>[:spec_core, :spec_model, :spec_plugin, :spec_core_ext] do
 
   if defined?(RUBY_ENGINE) && RUBY_ENGINE == 'jruby'
     ENV['SEQUEL_SQLITE_URL'] = "jdbc:sqlite::memory:"
-    ENV['SEQUEL_POSTGRES_URL'] = "jdbc:postgresql://localhost/#{pg_database}?user=postgres"
-    ENV['SEQUEL_MYSQL_URL'] = "jdbc:mysql://#{mysql_host}/sequel_test?user=root#{mysql_password}&useSSL=false"
+    ENV['SEQUEL_POSTGRES_URL'] = "jdbc:postgresql://localhost/#{pg_database}?user=postgres&password=postgres"
+    ENV['SEQUEL_MYSQL_URL'] = "jdbc:mysql://#{mysql_host}/sequel_test?user=root#{mysql_password}&useSSL=false&allowPublicKeyRetrieval=true"
   else
     ENV['SEQUEL_SQLITE_URL'] = "sqlite:/"
-    ENV['SEQUEL_POSTGRES_URL'] = "postgres://localhost/#{pg_database}?user=postgres"
+    ENV['SEQUEL_POSTGRES_URL'] = "postgres://localhost/#{pg_database}?user=postgres&password=postgres"
     ENV['SEQUEL_MYSQL_URL'] = "mysql2://#{mysql_host}/sequel_test?user=root#{mysql_password}&useSSL=false"
   end
 
-  Rake::Task['spec_postgres'].invoke
+  if RUBY_VERSION >= '2.2'
+    Rake::Task['spec_postgres'].invoke
+  end
 
   if RUBY_VERSION >= '2.4'
     Rake::Task['spec_sqlite'].invoke

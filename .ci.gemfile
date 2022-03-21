@@ -1,4 +1,4 @@
-# This file is only used for TravisCI integration.
+# This file is only used for CI.
 
 source 'http://rubygems.org'
 
@@ -18,7 +18,7 @@ else
 end
 
 if RUBY_VERSION < '2.2.0'
-  gem 'activemodel', '<4.0.0'
+  gem 'activemodel', '<5.0.0'
 elsif RUBY_VERSION < '2.4.0'
   gem 'activemodel', '<6.0.0'
 else
@@ -55,7 +55,7 @@ platforms :ruby do
 
   # Test current sequel_pg on half of the MRIs, and pure-ruby on the other half
   if sequel_pg
-    gem 'sequel_pg', github: 'jeremyevans/sequel_pg', require: 'sequel'
+    gem 'sequel_pg', git: 'https://github.com/jeremyevans/sequel_pg', require: 'sequel'
   end
 end
 

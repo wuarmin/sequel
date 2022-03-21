@@ -97,6 +97,7 @@ describe Sequel::Model, "associate" do
   it "should clone an existing association with the :clone option" do
     begin
       class ::ParParent < Sequel::Model; end
+      class ::ParParent2 < Sequel::Model; end
       klass = Class.new(Sequel::Model(:nodes))
       
       klass.many_to_one(:par_parent, :order=>:a){|ds| 1}
@@ -105,12 +106,12 @@ describe Sequel::Model, "associate" do
 
       klass.many_to_one :par, :clone=>:par_parent, :select=>:b
       klass.one_to_many :par1s, :clone=>:par_parent1s, :order=>:b, :limit=>10, :block=>nil
-      klass.many_to_many(:par2s, :clone=>:par_parent2s, :order=>:c){|ds| 3}
+      klass.many_to_many(:par2s, :clone=>:par_parent2s, :order=>:c, :class=>:ParParent2){|ds| 3}
       klass.many_to_one :par3, :clone=>:par
       
       klass.association_reflection(:par).associated_class.must_equal ParParent
       klass.association_reflection(:par1s).associated_class.must_equal ParParent
-      klass.association_reflection(:par2s).associated_class.must_equal ParParent
+      klass.association_reflection(:par2s).associated_class.must_equal ParParent2
       
       klass.association_reflection(:par)[:order].must_equal :a
       klass.association_reflection(:par).select.must_equal :b
@@ -127,6 +128,7 @@ describe Sequel::Model, "associate" do
       klass.association_reflection(:par3)[:eager_block].call.must_equal 1
     ensure
       Object.send(:remove_const, :ParParent)
+      Object.send(:remove_const, :ParParent2)
     end
   end
 
@@ -978,7 +980,7 @@ describe Sequel::Model, "one_to_one" do
     @c2.load(:id => 1234).attribute = attrib
     DB.sqls.must_equal []
     db.sqls.must_equal [
-      "SELECT * FROM (SELECT * FROM attributes INNER JOIN foo ON (foo.attribute_id = attributes.id)) AS attributes LIMIT 1",
+      "SELECT * FROM (SELECT * FROM attributes INNER JOIN foo ON (foo.attribute_id = attributes.id)) AS attributes LIMIT 0",
       "SELECT * FROM (SELECT * FROM attributes INNER JOIN foo ON (foo.attribute_id = attributes.id)) AS attributes WHERE (node_id = 1234) LIMIT 1",
       "INSERT INTO attributes (id, node_id) VALUES (3, 1234)",
       "SELECT * FROM (SELECT * FROM attributes INNER JOIN foo ON (foo.attribute_id = attributes.id)) AS attributes WHERE (id = 3) LIMIT 1"]

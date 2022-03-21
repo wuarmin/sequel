@@ -1,5 +1,3 @@
-require_relative "../sequel_warning"
-
 if ENV['COVERAGE']
   require_relative "../sequel_coverage"
   SimpleCov.sequel_coverage(:filter=>%r{lib/sequel/(extensions|plugins)/\w+\.rb\z})
@@ -26,6 +24,7 @@ end
 begin
   # Attempt to load ActiveSupport blank extension and inflector first, so Sequel
   # can override them.
+  require 'active_support'
   require 'active_support/core_ext/object/blank'
   require 'active_support/inflector'
   require 'active_support/core_ext/string/inflections'

@@ -87,7 +87,7 @@ module Sequel
 
     def self.mock_adapter_setup(db)
       db.instance_exec do
-        @server_version = 90500
+        @server_version = 140000
         initialize_postgres_adapter
         extend(MockAdapterDatabaseMethods)
       end
@@ -1504,9 +1504,9 @@ module Sequel
         if column[:text]
           :text
         elsif column[:fixed]
-          "char(#{column[:size]||255})"
+          "char(#{column[:size]||default_string_column_size})"
         elsif column[:text] == false || column[:size]
-          "varchar(#{column[:size]||255})"
+          "varchar(#{column[:size]||default_string_column_size})"
         else
           :text
         end
@@ -2160,6 +2160,38 @@ module Sequel
       # Use WITH RECURSIVE instead of WITH if any of the CTEs is recursive
       def select_with_sql_base
         opts[:with].any?{|w| w[:recursive]} ? "WITH RECURSIVE " : super
+      end
+
+      # Support PostgreSQL 14+ CTE SEARCH/CYCLE clauses
+      def select_with_sql_cte(sql, cte)
+        super
+
+        if search_opts = cte[:search]
+          sql << if search_opts[:type] == :breadth
+            " SEARCH BREADTH FIRST BY "
+          else
+            " SEARCH DEPTH FIRST BY "
+          end
+
+          identifier_list_append(sql, Array(search_opts[:by]))
+          sql << " SET "
+          identifier_append(sql, search_opts[:set] || :ordercol)
+        end
+
+        if cycle_opts = cte[:cycle]
+          sql << " CYCLE "
+          identifier_list_append(sql, Array(cycle_opts[:columns]))
+          sql << " SET "
+          identifier_append(sql, cycle_opts[:cycle_column] || :is_cycle)
+          if cycle_opts.has_key?(:cycle_value)
+            sql << " TO "
+            literal_append(sql, cycle_opts[:cycle_value])
+            sql << " DEFAULT "
+            literal_append(sql, cycle_opts.fetch(:noncycle_value, false))
+          end
+          sql << " USING "
+          identifier_append(sql, cycle_opts[:path_column] || :path)
+        end
       end
 
       # The version of the database server
